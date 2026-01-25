@@ -1,6 +1,8 @@
 import base64
 import json
+import re
 import sys
+import time
 from pathlib import Path
 
 import streamlit as st
@@ -12,9 +14,14 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.core.pipeline import run_pipeline
+from src.llm.client import LLMClient, LLMClientError
 from src.utils.config import get_config
 from app.sample_notes import SAMPLE_NOTES
 from src.utils.logging import get_logger
+from src.export.fhir_bundle import build_fhir_bundle
+from src.privacy.patterns import PHONE_RE, EMAIL_RE, AADHAAR_RE, MRN_RE
+from src.validate.normalizers import normalize_structured
+from src.validate.validators import run_validations
 
 load_dotenv()
 logger = get_logger()
@@ -226,6 +233,16 @@ div[data-testid="stAppViewBlockContainer"] {
 }
 .stTabs [data-baseweb="tab"] {
   font-weight: 700;
+  color: var(--atlas-ink) !important;
+}
+.stTabs [data-baseweb="tab"] * {
+  color: var(--atlas-ink) !important;
+}
+[data-testid="stToggle"] *,
+.stToggle label,
+.stToggle span,
+.stToggle p {
+  color: var(--atlas-ink) !important;
 }
 .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5 {
   color: var(--atlas-ink);
@@ -294,10 +311,202 @@ footer {
   margin: 6px 6px 0 0;
   font-size: 0.9rem;
 }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--atlas-border);
+  background: #f6efe4;
+  font-size: 0.82rem;
+  margin: 6px 6px 0 0;
+}
+.chip-missing {
+  border-color: rgba(199, 136, 42, 0.5);
+  background: rgba(199, 136, 42, 0.12);
+  color: #7a4d12;
+}
+.chip-present {
+  border-color: rgba(15, 107, 103, 0.4);
+  background: rgba(15, 107, 103, 0.12);
+  color: #0f6b67;
+}
+.score-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.score-value {
+  font-size: 2rem;
+  font-weight: 900;
+}
+.progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #ece4d6;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #0f6b67, #0b5a57);
+}
+.hl-complaint {
+  background: rgba(15, 107, 103, 0.18);
+  padding: 0 4px;
+  border-radius: 6px;
+}
+.hl-med {
+  background: rgba(199, 136, 42, 0.22);
+  padding: 0 4px;
+  border-radius: 6px;
+}
+.hl-dx {
+  background: rgba(21, 39, 38, 0.15);
+  padding: 0 4px;
+  border-radius: 6px;
+}
+.hl-test {
+  background: rgba(79, 96, 93, 0.2);
+  padding: 0 4px;
+  border-radius: 6px;
+}
+.highlight-card {
+  background: #fffdfa;
+  border: 1px dashed var(--atlas-border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  line-height: 1.7;
+}
+.hl-pii {
+  background: rgba(196, 55, 55, 0.2);
+  padding: 0 4px;
+  border-radius: 6px;
+  color: #7a1f1f;
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
+
+
+def highlight_note(text: str, summary) -> str:
+    if not text:
+        return ""
+    highlights = []
+    for item in (summary.complaints or []):
+        highlights.append((item, "hl-complaint"))
+    for item in (summary.medications or []):
+        if item and getattr(item, "name", None):
+            highlights.append((item.name, "hl-med"))
+    for item in (summary.diagnosis or []):
+        highlights.append((item, "hl-dx"))
+    for item in (summary.tests or []):
+        highlights.append((item, "hl-test"))
+
+    # Sort longest first to reduce nested replacements.
+    highlights = sorted(
+        {h for h in highlights if h[0]},
+        key=lambda x: len(x[0]),
+        reverse=True,
+    )
+
+    def _wrap(match, cls):
+        return f'<span class="{cls}">{match.group(0)}</span>'
+
+    out = text
+    for phrase, cls in highlights:
+        try:
+            pattern = re.compile(re.escape(phrase), flags=re.IGNORECASE)
+            out = pattern.sub(lambda m: _wrap(m, cls), out)
+        except re.error:
+            continue
+    return out
+
+
+def highlight_pii(text: str) -> str:
+    if not text:
+        return ""
+    out = text
+    for regex in (PHONE_RE, EMAIL_RE, AADHAAR_RE, MRN_RE):
+        try:
+            out = regex.sub(lambda m: f'<span class="hl-pii">{m.group(0)}</span>', out)
+        except re.error:
+            continue
+    return out
+
+
+def compute_completeness(summary) -> tuple[int, list[str], list[str]]:
+    present = []
+    missing = []
+
+    if summary.complaints:
+        present.append("complaints")
+    else:
+        missing.append("complaints")
+
+    if summary.duration:
+        present.append("duration")
+    else:
+        missing.append("duration")
+
+    if summary.vitals:
+        vitals_fields = [
+            ("bp_systolic", summary.vitals.bp_systolic),
+            ("bp_diastolic", summary.vitals.bp_diastolic),
+            ("hr", summary.vitals.hr),
+            ("spo2", summary.vitals.spo2),
+            ("temp", summary.vitals.temp),
+        ]
+        if any(v for _, v in vitals_fields):
+            present.append("vitals")
+        else:
+            missing.append("vitals")
+    else:
+        missing.append("vitals")
+
+    if summary.diagnosis:
+        present.append("diagnosis")
+    else:
+        missing.append("diagnosis")
+
+    if summary.medications:
+        present.append("medications")
+    else:
+        missing.append("medications")
+
+    if summary.tests:
+        present.append("tests")
+    else:
+        missing.append("tests")
+
+    if summary.advice:
+        present.append("advice")
+    else:
+        missing.append("advice")
+
+    if summary.follow_up:
+        present.append("follow_up")
+    else:
+        missing.append("follow_up")
+
+    total = len(present) + len(missing)
+    score = int(round((len(present) / total) * 100)) if total else 0
+    return score, present, missing
+
+
+def apply_edits(summary, note_text: str, base_flags):
+    normalize_structured(summary)
+    vflags = run_validations(summary, note_text)
+    flags = list(base_flags or [])
+    for f in vflags:
+        if f not in flags:
+            flags.append(f)
+    summary.flags = flags
+    bundle = build_fhir_bundle(summary)
+    return summary, flags, bundle
 
 if "note_text" not in st.session_state:
     st.session_state.note_text = ""
@@ -307,6 +516,16 @@ if "last_result" not in st.session_state:
     st.session_state.last_result = None
 if "last_error" not in st.session_state:
     st.session_state.last_error = None
+if "last_run_note" not in st.session_state:
+    st.session_state.last_run_note = ""
+if "last_run_time" not in st.session_state:
+    st.session_state.last_run_time = 0.0
+if "edit_payload" not in st.session_state:
+    st.session_state.edit_payload = {}
+if "followup_questions" not in st.session_state:
+    st.session_state.followup_questions = []
+if "followup_error" not in st.session_state:
+    st.session_state.followup_error = None
 
 provider_label = "OpenAI" if cfg.provider == "openai" else "Ollama"
 model_label = cfg.model if cfg.provider == "openai" else (cfg.ollama_model or "local model")
@@ -353,6 +572,78 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+def trigger_pipeline(note_text: str, sample_choice: str):
+    if not note_text.strip():
+        st.session_state.last_result = None
+        st.session_state.last_error = "Please paste a note or load a sample."
+        return
+    try:
+        llm_client = None
+        if cfg.provider == "openai" and not cfg.has_api_key:
+            if sample_choice != "-- none --":
+                class DummyLLM:
+                    def extract_structured(self, note_text, options=None):
+                        return {
+                            "complaints": ["sample"],
+                            "duration": None,
+                            "vitals": None,
+                            "findings": None,
+                            "diagnosis": None,
+                            "medications": [],
+                            "tests": [],
+                            "advice": None,
+                            "follow_up": None,
+                            "flags": [],
+                        }
+
+                    def repair_json(self, note_text, bad_json, options=None):
+                        return self.extract_structured(note_text)
+
+                llm_client = DummyLLM()
+            else:
+                st.session_state.last_result = None
+                st.session_state.last_error = (
+                    "OPENAI_API_KEY not set. Please set it to structure arbitrary notes or load a sample note."
+                )
+                return
+
+        st.session_state.last_error = None
+        with st.spinner("Structuring note..."):
+            result = run_pipeline(
+                note_text,
+                options={"model": cfg.model, "base_url": cfg.base_url},
+                llm_client=llm_client,
+            )
+        st.session_state.last_result = result
+        st.session_state.last_run_note = note_text
+        st.session_state.last_run_time = time.time()
+    except Exception as e:
+        logger.exception("Pipeline failed")
+        st.session_state.last_result = None
+        st.session_state.last_error = str(e)
+
+
+def generate_followups(note_text: str, summary, flags):
+    try:
+        llm = LLMClient(
+            model=cfg.model,
+            provider=cfg.provider,
+            base_url=cfg.base_url,
+            ollama_model=cfg.ollama_model,
+            ollama_base_url=cfg.ollama_base_url,
+        )
+        data = llm.generate_followup_questions(
+            note_text=note_text,
+            structured_json=summary.dict(),
+            flags=flags or [],
+        )
+        st.session_state.followup_questions = data.get("questions", [])
+        st.session_state.followup_error = None
+    except LLMClientError as e:
+        st.session_state.followup_questions = []
+        st.session_state.followup_error = str(e)
+
 col1, col2 = st.columns([2.1, 1])
 with col1:
     st.markdown('<div class="section-title">Clinical Note</div>', unsafe_allow_html=True)
@@ -370,6 +661,8 @@ with col1:
     with action_cols[1]:
         if st.button("Clear"):
             st.session_state.note_text = ""
+            st.session_state.last_result = None
+            st.session_state.last_error = None
     with action_cols[2]:
         st.markdown(
             '<span class="mono">Tip:</span> Use short, focused sentences for best extraction.',
@@ -406,37 +699,8 @@ if cfg.provider == "ollama" and not cfg.ollama_model:
     st.warning("OLLAMA_MODEL not set. Add it in .env to run with Ollama.")
 
 if run_button:
-    if not note_text.strip():
-        st.error("Please paste a note or load a sample.")
-    else:
-        try:
-            # If API key missing, allow mock run only for sample notes
-            llm_client = None
-            if cfg.provider == "openai" and not cfg.has_api_key:
-                if sample != "-- none --":
-                    class DummyLLM:
-                        def extract_structured(self, note_text, options=None):
-                            return {"complaints": ["sample"], "duration": None, "vitals": None, "findings": None, "diagnosis": None, "medications": [], "tests": [], "advice": None, "follow_up": None, "flags": []}
-                        def repair_json(self, note_text, bad_json, options=None):
-                            return self.extract_structured(note_text)
-                    llm_client = DummyLLM()
-                else:
-                    st.error("OPENAI_API_KEY not set. Please set it to structure arbitrary notes or load a sample note to run in mock mode.")
-                    llm_client = None
+    trigger_pipeline(note_text, sample)
 
-            st.session_state.last_error = None
-            with st.spinner("Structuring note..."):
-                result = run_pipeline(
-                    note_text,
-                    options={"model": cfg.model, "base_url": cfg.base_url},
-                    llm_client=llm_client,
-                )
-            st.session_state.last_result = result
-        except Exception as e:
-            logger.exception("Pipeline failed")
-            st.session_state.last_result = None
-            st.session_state.last_error = str(e)
-            st.error(f"Pipeline error: {e}")
 
 if st.session_state.last_error:
     st.error(st.session_state.last_error)
@@ -448,8 +712,52 @@ if st.session_state.last_result:
     flags = result["flags"]
     masked = result.get("masked_note")
     raw = result.get("raw_llm_json")
+    base_flags = [f for f in (flags or []) if f.startswith("PII detected")]
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Live Atlas — Evidence Highlights</div>', unsafe_allow_html=True)
+    highlighted = highlight_note(note_text, summary)
+    if highlighted:
+        st.markdown(f'<div class="highlight-card">{highlighted}</div>', unsafe_allow_html=True)
+    else:
+        st.info("No highlights available yet. Add a few symptoms or medications in the note.")
+
+    st.markdown('<div class="section-title">Completeness Score</div>', unsafe_allow_html=True)
+    score, present_fields, missing_fields = compute_completeness(summary)
+    score_cols = st.columns([1, 2])
+    score_cols[0].markdown(
+        f"""
+<div class="card score-card">
+  <div class="card-title">Documentation completeness</div>
+  <div class="score-value">{score}%</div>
+  <div class="mono">Score = % of key sections captured</div>
+  <div class="progress-track"><div class="progress-fill" style="width:{score}%"></div></div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    missing_html = (
+        "".join([f'<span class="chip chip-missing">• {m}</span>' for m in missing_fields])
+        if missing_fields
+        else '<span class="chip chip-present">✓ All key sections present</span>'
+    )
+    score_cols[1].markdown(
+        f"""
+<div class="card score-card">
+  <div class="card-title">Missing sections</div>
+  <div>{missing_html}</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div class="section-title">PII Heatmap</div>', unsafe_allow_html=True)
+    pii_highlight = highlight_pii(note_text)
+    if pii_highlight != note_text:
+        st.markdown(f'<div class="highlight-card">{pii_highlight}</div>', unsafe_allow_html=True)
+    else:
+        st.success("No PII patterns detected in the note.")
+
     st.markdown('<div class="section-title">At a Glance</div>', unsafe_allow_html=True)
     metric_cols = st.columns(4)
     metric_cols[0].markdown(
@@ -489,10 +797,52 @@ if st.session_state.last_result:
         unsafe_allow_html=True,
     )
 
-    tabs = st.tabs(["Structured Summary", "Flags", "FHIR Export", "Raw JSON (Debug)"])
+    tabs = st.tabs(["Structured Summary", "Clarifying Questions", "Flags", "FHIR Export", "Raw JSON (Debug)"])
 
     with tabs[0]:
         st.subheader("Structured Summary")
+        with st.expander("Quick edits (update structured fields & FHIR)", expanded=False):
+            with st.form("edit_structured"):
+                complaints_val = ", ".join(summary.complaints or [])
+                diagnosis_val = ", ".join(summary.diagnosis or [])
+                advice_val = summary.advice or ""
+                follow_up_val = summary.follow_up or ""
+
+                complaints_in = st.text_input("Complaints (comma-separated)", value=complaints_val)
+                diagnosis_in = st.text_input("Diagnosis (comma-separated)", value=diagnosis_val)
+                advice_in = st.text_input("Advice", value=advice_val)
+                follow_up_in = st.text_input("Follow-up", value=follow_up_val)
+
+                meds_inputs = []
+                for idx, med in enumerate(summary.medications or []):
+                    st.markdown(f"<div class='section-title'>Medication {idx+1}: {med.name}</div>", unsafe_allow_html=True)
+                    dose = st.text_input(f"Dose", value=med.dose or "", key=f"med_{idx}_dose")
+                    freq = st.text_input(f"Frequency", value=med.frequency or "", key=f"med_{idx}_freq")
+                    dur = st.text_input(f"Duration", value=med.duration or "", key=f"med_{idx}_dur")
+                    meds_inputs.append((idx, dose, freq, dur))
+
+                if st.form_submit_button("Apply edits"):
+                    summary.complaints = [c.strip() for c in complaints_in.split(",") if c.strip()] or None
+                    summary.diagnosis = [d.strip() for d in diagnosis_in.split(",") if d.strip()] or None
+                    summary.advice = advice_in.strip() or None
+                    summary.follow_up = follow_up_in.strip() or None
+                    for idx, dose, freq, dur in meds_inputs:
+                        if summary.medications and idx < len(summary.medications):
+                            summary.medications[idx].dose = dose.strip() or None
+                            summary.medications[idx].frequency = freq.strip() or None
+                            summary.medications[idx].duration = dur.strip() or None
+
+                    summary, flags, bundle = apply_edits(summary, note_text, base_flags)
+                    st.session_state.last_result = {
+                        "structured": summary,
+                        "bundle": bundle,
+                        "flags": flags,
+                        "masked_note": masked,
+                        "raw_llm_json": raw,
+                    }
+                    st.success("Edits applied.")
+                    st.rerun()
+
         summary_cols = st.columns(2)
         with summary_cols[0]:
             st.markdown(
@@ -558,6 +908,31 @@ if st.session_state.last_result:
         with st.expander("Full structured JSON"):
             st.json(summary.dict())
     with tabs[1]:
+        st.subheader("Clarifying Questions")
+        info_cols = st.columns([1.2, 2])
+        with info_cols[0]:
+            can_run = True
+            if cfg.provider == "openai" and not cfg.has_api_key:
+                can_run = False
+            if cfg.provider == "ollama" and not cfg.ollama_model:
+                can_run = False
+            if st.button("Generate questions", disabled=not can_run):
+                generate_followups(note_text, summary, flags)
+        with info_cols[1]:
+            st.markdown(
+                "<div class='muted'>Auto‑suggested questions to complete missing fields. Uses a second LLM call.</div>",
+                unsafe_allow_html=True,
+            )
+
+        if st.session_state.followup_error:
+            st.error(st.session_state.followup_error)
+        elif st.session_state.followup_questions:
+            for idx, q in enumerate(st.session_state.followup_questions, start=1):
+                st.markdown(f"<div class='card'>Q{idx}. {q}</div>", unsafe_allow_html=True)
+        else:
+            st.info("No questions generated yet.")
+
+    with tabs[2]:
         st.subheader("Flags")
         if flags:
             for f in flags:
@@ -567,7 +942,7 @@ if st.session_state.last_result:
         if masked and masked != note_text:
             st.info("PII was detected and masked before sending to LLM.")
             st.text_area("Masked note", value=masked, height=120)
-    with tabs[2]:
+    with tabs[3]:
         st.subheader("FHIR-like Export (preview)")
         st.markdown(
             """
@@ -581,7 +956,7 @@ if st.session_state.last_result:
         with st.expander("FHIR JSON"):
             st.json(bundle)
         st.download_button("Download FHIR JSON", data=json.dumps(bundle, default=str, indent=2), file_name="abdm_bundle.json", mime="application/json")
-    with tabs[3]:
+    with tabs[4]:
         st.subheader("Raw LLM JSON (debug)")
         with st.expander("Raw JSON response"):
             st.json(raw)

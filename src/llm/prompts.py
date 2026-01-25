@@ -36,3 +36,25 @@ Return JSON only.
 Broken JSON:
 {bad_json}
 '''
+
+QUESTIONS_PROMPT = '''
+You are a clinical documentation assistant. Generate clarifying questions to complete missing or ambiguous fields.
+Use ONLY the note text, structured JSON, and flags provided. Do NOT invent diagnoses or clinical facts.
+
+Return JSON only in this exact shape:
+{{"questions": ["question 1", "question 2", "question 3"]}}
+
+Guidance:
+- Keep questions short and specific.
+- Ask only what is missing or unclear (e.g., dose, frequency, duration, vitals, follow-up).
+- If everything is complete, return {{"questions": []}}.
+
+NOTE:
+{note_text}
+
+STRUCTURED_JSON:
+{structured_json}
+
+FLAGS:
+{flags_json}
+'''
