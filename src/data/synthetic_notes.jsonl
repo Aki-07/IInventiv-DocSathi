@@ -1,0 +1,1 @@
+{"note_text": "Pt complains of cough and fever for 2 days. Temp 38.5 C. No SOB. Prescribed Paracetamol 500 mg OD PRN.", "ground_truth": {"complaints": ["cough","fever"], "vitals": {"temp": "38.5 C"}, "medications": [{"name": "Paracetamol", "dose": "500 mg", "frequency": "once daily", "prn": true}]}}

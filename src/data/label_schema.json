@@ -1,0 +1,3 @@
+{
+  "fields": ["complaints","duration","vitals","findings","diagnosis","medications","tests","advice","follow_up"]
+}
