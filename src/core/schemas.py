@@ -18,7 +18,7 @@ class Medication(BaseModel):
 
 
 class Vitals(BaseModel):
-    bp_systolic: Optional[int] = None
+    bp_systolic: Optional[int | str] = None  # can be str like "120/80" before normalization
     bp_diastolic: Optional[int] = None
     hr: Optional[int] = None
     spo2: Optional[float] = None

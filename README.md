@@ -62,7 +62,7 @@ If `OPENAI_API_KEY` is missing, the app should show a clear message and disable 
 ## Project structure
 
 ```
-abdm-note-assistant/
+IInventiv-DocSathi/
 ├─ app/                         # Streamlit UI
 │  ├─ streamlit_app.py
 │  ├─ ui_components.py

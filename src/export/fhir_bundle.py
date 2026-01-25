@@ -3,7 +3,7 @@ from typing import Dict, Any
 
 
 def _obs_resource(code: str, value: Any, unit: str = None):
-    res = {"resourceType": "Observation", "code": {"text": code}, "value": value, "timestamp": datetime.utcnow().isoformat()}
+    res = {"resourceType": "Observation", "code": {"text": code}, "value": value, "timestamp": datetime.now().isoformat()}
     if unit:
         res["unit"] = unit
     return res
@@ -11,13 +11,13 @@ def _obs_resource(code: str, value: Any, unit: str = None):
 
 def build_fhir_bundle(structured) -> Dict[str, Any]:
     # Minimal FHIR-like bundle
-    bundle = {"resourceType": "Bundle", "type": "document", "timestamp": datetime.utcnow().isoformat(), "entry": []}
+    bundle = {"resourceType": "Bundle", "type": "document", "timestamp": datetime.now().isoformat(), "entry": []}
 
     # Patient placeholder
     bundle["entry"].append({"resource": {"resourceType": "Patient", "id": "deidentified", "meta": {"note": "de-identified placeholder"}}})
 
     # Encounter
-    bundle["entry"].append({"resource": {"resourceType": "Encounter", "status": "finished", "period": {"start": datetime.utcnow().isoformat()}}})
+    bundle["entry"].append({"resource": {"resourceType": "Encounter", "status": "finished", "period": {"start": datetime.now().isoformat()}}})
 
     # Vitals
     v = structured.vitals
