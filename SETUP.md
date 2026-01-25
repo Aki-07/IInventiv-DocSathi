@@ -38,6 +38,16 @@ OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-5-mini
 ```
 
+### Optional: Run without OpenAI using Ollama
+
+If you have Ollama running locally:
+
+```
+LLM_PROVIDER=ollama
+OLLAMA_MODEL=llama3
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
 ### 3. Run the Streamlit app
 
 ```bash
