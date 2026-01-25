@@ -1,4 +1,4 @@
-# ABDM-Ready Clinical Note Structuring Assistant (DocSathi)
+# DocSathi: ABDM-Ready Clinical Note Structuring Assistant
 
 A clinician-facing documentation assistant that converts **free-text OPD/clinic notes** into a **standardized visit summary** and an **ABDM-aligned, interoperable structured export**. It is designed for **documentation support only** (not diagnosis): missing or uncertain details are **flagged for clinician confirmation** instead of being guessed.
 
@@ -13,24 +13,6 @@ Given a free-text note (synthetic / de-identified), the app:
 - **Not for diagnosis.** The system never infers diagnoses. It only captures a diagnosis/problem if explicitly present in the note.
 - **No hallucination policy.** If a value is not present, it stays `null` and is flagged.
 - **Use only synthetic/de-identified text** in demo mode. A PII detector masks common identifiers before LLM calls.
-
----
-
-# ABDM-Ready Clinical Note Structuring Assistant (DocSathi)
-
-A clinician-facing documentation assistant that converts **free-text OPD/clinic notes** into a **standardized visit summary** and an **ABDM-aligned, interoperable structured export**. It is designed for **documentation support only** (not diagnosis): missing or uncertain details are **flagged for clinician confirmation** instead of being guessed.
-
-## What this project does
-Given a free-text note (synthetic / de-identified), the app:
-- Extracts structured fields (complaints, duration, vitals, medications, tests, follow-up, etc.)
-- Runs deterministic validation + normalization (e.g., BP split, frequency normalization)
-- Produces a compact **Flags** list for missing/ambiguous items
-- Exports a minimal **FHIR-like bundle** shaped for downstream ABDM-style workflows (mapping-ready; not claiming certification)
-
-## Safety & scope
-- **Not for diagnosis.** The system never infers diagnoses. It only captures a diagnosis/problem if explicitly present in the note.
-- **No hallucination policy.** If a value is not present, it stays `null` and is flagged.
-- **Use only synthetic/de-identified text** in demos. A PII detector masks common identifiers before LLM calls.
 
 ---
 
