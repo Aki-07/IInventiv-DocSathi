@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 # Ensure repo root is on sys.path so `src` imports work when running via Streamlit.
@@ -27,7 +28,7 @@ load_dotenv()
 logger = get_logger()
 cfg = get_config()
 
-st.set_page_config(page_title="DocSathi — Clinical Atlas", layout="wide", page_icon="🩺")
+st.set_page_config(page_title="DocSathi : OurClinical Atlas", layout="wide", page_icon="🩺")
 
 st.markdown(
     """
@@ -60,7 +61,11 @@ section[data-testid="stAppViewContainer"] {
 }
 
 div[data-testid="stAppViewBlockContainer"] {
-  padding-top: 1.5rem;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+.block-container {
+  padding-top: 0 !important;
 }
 
 [data-testid="stSidebar"] {
@@ -117,7 +122,8 @@ div[data-testid="stAppViewBlockContainer"] {
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-top: 12px;
+  margin-bottom: 12px;
 }
 .navbar-left {
   display: flex;
@@ -166,6 +172,63 @@ div[data-testid="stAppViewBlockContainer"] {
   padding: 16px 18px;
   box-shadow: var(--atlas-shadow);
 }
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--atlas-border);
+  font-size: 0.82rem;
+  margin: 6px 6px 0 0;
+}
+.status-ok {
+  background: rgba(15, 107, 103, 0.12);
+  color: #0f6b67;
+  border-color: rgba(15, 107, 103, 0.35);
+}
+.status-warn {
+  background: rgba(199, 136, 42, 0.15);
+  color: #7a4d12;
+  border-color: rgba(199, 136, 42, 0.45);
+}
+.status-info {
+  background: rgba(21, 39, 38, 0.08);
+  color: var(--atlas-ink);
+}
+.navbar {
+  animation: fadeUp 0.6s ease both;
+}
+.stepper {
+  animation: fadeUp 0.7s ease both;
+}
+.card,
+.highlight-card {
+  animation: fadeUp 0.65s ease both;
+}
+.status-chip,
+.flag-pill,
+.chip {
+  animation: fadeUp 0.5s ease both;
+}
+.status-chip:nth-child(1) { animation-delay: 0.05s; }
+.status-chip:nth-child(2) { animation-delay: 0.10s; }
+.status-chip:nth-child(3) { animation-delay: 0.15s; }
+.status-chip:nth-child(4) { animation-delay: 0.20s; }
+.chip:nth-child(1) { animation-delay: 0.05s; }
+.chip:nth-child(2) { animation-delay: 0.10s; }
+.chip:nth-child(3) { animation-delay: 0.15s; }
+.chip:nth-child(4) { animation-delay: 0.20s; }
+.chip:nth-child(5) { animation-delay: 0.25s; }
+.chip:nth-child(6) { animation-delay: 0.30s; }
+.chip:nth-child(7) { animation-delay: 0.35s; }
+.chip:nth-child(8) { animation-delay: 0.40s; }
+.chip:nth-child(9) { animation-delay: 0.45s; }
+.chip:nth-child(10) { animation-delay: 0.50s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .card-title {
   font-size: 0.95rem;
   color: var(--atlas-muted);
@@ -207,6 +270,21 @@ div[data-testid="stAppViewBlockContainer"] {
   background: #9fb8b6;
   box-shadow: none;
 }
+.stDownloadButton > button {
+  background: #f5efe4 !important;
+  color: var(--atlas-ink) !important;
+  border: 1px solid var(--atlas-border) !important;
+  box-shadow: none !important;
+}
+.stDownloadButton > button:hover {
+  background: #efe6d6 !important;
+  color: var(--atlas-ink) !important;
+}
+[data-testid="stFormSubmitButton"] > button {
+  background: linear-gradient(120deg, #0f6b67, #0b5a57) !important;
+  color: #fff !important;
+  border: 1px solid rgba(15, 107, 103, 0.4) !important;
+}
 .stTextArea textarea {
   border-radius: 14px;
   border: 1px solid var(--atlas-border);
@@ -237,6 +315,21 @@ div[data-testid="stAppViewBlockContainer"] {
 }
 .stTabs [data-baseweb="tab"] * {
   color: var(--atlas-ink) !important;
+}
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary span,
+[data-testid="stExpander"] summary svg {
+  color: var(--atlas-ink) !important;
+}
+[data-testid="stExpander"] {
+  border-color: var(--atlas-border) !important;
+}
+.stSpinner > div > div,
+.stSpinner div[role="status"],
+.stSpinner svg {
+  color: var(--atlas-ink) !important;
+  fill: var(--atlas-ink) !important;
 }
 [data-testid="stToggle"] *,
 .stToggle label,
@@ -286,6 +379,7 @@ footer {
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 10px;
+  margin-bottom: 18px;
 }
 .step {
   padding: 6px 12px;
@@ -297,8 +391,8 @@ footer {
 }
 .step-active {
   border-style: solid;
-  color: var(--atlas-teal);
-  background: rgba(15,107,103,0.12);
+  color: var(--atlas-ink);
+  background: #f3f0e8;
 }
 .flag-pill {
   display: inline-flex;
@@ -352,6 +446,25 @@ footer {
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(120deg, #0f6b67, #0b5a57);
+}
+.inline-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--atlas-ink);
+  margin-top: 6px;
+}
+.spinner-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(15, 107, 103, 0.35);
+  border-top-color: var(--atlas-teal);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 .hl-complaint {
   background: rgba(15, 107, 103, 0.18);
@@ -552,7 +665,7 @@ st.markdown(
   <div class="navbar-left">
     {logo_html}
     <div>
-      <div class="navbar-title">DocSathi — Clinical Atlas</div>
+      <div class="navbar-title">DocSathi : OurClinical Atlas</div>
       <div class="navbar-subtitle">ABDM-ready clinical note structuring assistant for documentation support only.</div>
     </div>
   </div>
@@ -609,12 +722,11 @@ def trigger_pipeline(note_text: str, sample_choice: str):
                 return
 
         st.session_state.last_error = None
-        with st.spinner("Structuring note..."):
-            result = run_pipeline(
-                note_text,
-                options={"model": cfg.model, "base_url": cfg.base_url},
-                llm_client=llm_client,
-            )
+        result = run_pipeline(
+            note_text,
+            options={"model": cfg.model, "base_url": cfg.base_url},
+            llm_client=llm_client,
+        )
         st.session_state.last_result = result
         st.session_state.last_run_note = note_text
         st.session_state.last_run_time = time.time()
@@ -633,9 +745,10 @@ def generate_followups(note_text: str, summary, flags):
             ollama_model=cfg.ollama_model,
             ollama_base_url=cfg.ollama_base_url,
         )
+        structured_payload = summary.model_dump() if hasattr(summary, "model_dump") else summary.dict()
         data = llm.generate_followup_questions(
             note_text=note_text,
-            structured_json=summary.dict(),
+            structured_json=structured_payload,
             flags=flags or [],
         )
         st.session_state.followup_questions = data.get("questions", [])
@@ -658,6 +771,7 @@ with col1:
     action_cols = st.columns([1, 1, 2])
     with action_cols[0]:
         run_button = st.button("Structure Note")
+        run_spinner_slot = st.empty()
     with action_cols[1]:
         if st.button("Clear"):
             st.session_state.note_text = ""
@@ -681,13 +795,36 @@ with col2:
         if st.button("Load sample"):
             st.session_state.note_text = SAMPLE_NOTES[sample]
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    guardrails = []
+    guardrails.append(("No diagnosis inference", "status-ok", "Always on"))
+
+    last_result = st.session_state.last_result
+    if last_result:
+        flags = last_result.get("flags", []) or []
+        masked_note = last_result.get("masked_note")
+        pii_detected = any(f.startswith("PII detected") for f in flags) or (masked_note and masked_note != note_text)
+        if pii_detected:
+            guardrails.append(("PII masked", "status-warn", "PII detected & redacted"))
+        else:
+            guardrails.append(("PII masked", "status-ok", "No PII detected"))
+
+        missing_flags = [f for f in flags if "missing" in f.lower() or "not documented" in f.lower()]
+        if missing_flags:
+            guardrails.append(("Missing fields flagged", "status-warn", f"{len(missing_flags)} flags"))
+        else:
+            guardrails.append(("Missing fields flagged", "status-ok", "No missing fields"))
+    else:
+        guardrails.append(("PII masked", "status-info", "Awaiting note"))
+        guardrails.append(("Missing fields flagged", "status-info", "Awaiting analysis"))
+
+    guardrails_html = "".join(
+        [f'<span class="status-chip {cls}">• {label}: {detail}</span>' for label, cls, detail in guardrails]
+    )
     st.markdown(
-        """
+        f"""
 <div class="card">
   <div class="card-title">Safety Guardrails</div>
-  <div>• No diagnosis inference</div>
-  <div>• Missing fields are flagged</div>
-  <div>• PII masked before LLM call</div>
+  <div>{guardrails_html}</div>
 </div>
 """,
         unsafe_allow_html=True,
@@ -699,13 +836,32 @@ if cfg.provider == "ollama" and not cfg.ollama_model:
     st.warning("OLLAMA_MODEL not set. Add it in .env to run with Ollama.")
 
 if run_button:
+    if "run_spinner_slot" in locals():
+        run_spinner_slot.markdown(
+            '<div class="inline-spinner"><span class="spinner-dot"></span>Structuring...</div>',
+            unsafe_allow_html=True,
+        )
     trigger_pipeline(note_text, sample)
+    if "run_spinner_slot" in locals():
+        run_spinner_slot.empty()
 
 
 if st.session_state.last_error:
     st.error(st.session_state.last_error)
 
 if st.session_state.last_result:
+    st.markdown('<div id="results-anchor"></div>', unsafe_allow_html=True)
+    components.html(
+        """
+<script>
+  const anchor = window.parent.document.querySelector('#results-anchor');
+  if (anchor) {
+    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+""",
+        height=0,
+    )
     result = st.session_state.last_result
     summary = result["structured"]
     bundle = result["bundle"]
@@ -800,7 +956,17 @@ if st.session_state.last_result:
     tabs = st.tabs(["Structured Summary", "Clarifying Questions", "Flags", "FHIR Export", "Raw JSON (Debug)"])
 
     with tabs[0]:
-        st.subheader("Structured Summary")
+        header_cols = st.columns([3, 1])
+        with header_cols[0]:
+            st.subheader("Structured Summary")
+        with header_cols[1]:
+            summary_json = summary.model_dump() if hasattr(summary, "model_dump") else summary.dict()
+            st.download_button(
+                "Download Summary JSON",
+                data=json.dumps(summary_json, default=str, indent=2),
+                file_name="structured_summary.json",
+                mime="application/json",
+            )
         with st.expander("Quick edits (update structured fields & FHIR)", expanded=False):
             with st.form("edit_structured"):
                 complaints_val = ", ".join(summary.complaints or [])
@@ -906,7 +1072,7 @@ if st.session_state.last_result:
             )
 
         with st.expander("Full structured JSON"):
-            st.json(summary.dict())
+            st.json(summary.model_dump() if hasattr(summary, "model_dump") else summary.dict())
     with tabs[1]:
         st.subheader("Clarifying Questions")
         info_cols = st.columns([1.2, 2])
