@@ -147,11 +147,10 @@ Environment variables:
 
 ---
 
-## License / usage
+## License
+License to be added.
 
-This repository is intended for R&D fair demonstration and prototyping. Do not use with real patient data without appropriate approvals, security controls, and compliance review.
+## Usage note
+Demo/prototype only. Do not use with real patient data without appropriate approvals, security controls, and compliance review.
 
-```
-::contentReference[oaicite:0]{index=0}
-```
 

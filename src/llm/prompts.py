@@ -9,7 +9,7 @@ Schema keys expected (top-level):
 - vitals: object with bp_systolic, bp_diastolic, hr, spo2, temp (use null if absent)
 - findings: string or null
 - diagnosis: list of strings or null (ONLY include if explicitly documented in note)
-- medications: list of objects {name,dose,route,frequency,duration,prn}
+- medications: list of objects (name, dose, route, frequency, duration, prn)
 - tests: list of strings or null
 - advice: string or null
 - follow_up: string or null

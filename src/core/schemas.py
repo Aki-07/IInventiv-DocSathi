@@ -22,7 +22,7 @@ class Vitals(BaseModel):
     bp_diastolic: Optional[int] = None
     hr: Optional[int] = None
     spo2: Optional[float] = None
-    temp: Optional[str] = None
+    temp: Optional[float | str] = None  # accept float (e.g. 98.6) or string
     evidence: Optional[Evidence] = None
 
 
