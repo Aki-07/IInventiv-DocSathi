@@ -9,7 +9,7 @@ class Evidence(BaseModel):
 
 class Medication(BaseModel):
     name: str
-    dose: Optional[str] = None
+    dose: Optional[str | int | float] = None
     route: Optional[str] = None
     frequency: Optional[str] = None
     duration: Optional[str] = None
@@ -37,7 +37,7 @@ class Vitals(BaseModel):
     bp_systolic: Optional[int | str] = None  # can be str like "120/80" before normalization
     bp_diastolic: Optional[int] = None
     hr: Optional[int] = None
-    spo2: Optional[float] = None
+    spo2: Optional[float | str] = None
     temp: Optional[float | str] = None  # accept float (e.g. 98.6) or string
     evidence: Optional[Evidence] = None
 

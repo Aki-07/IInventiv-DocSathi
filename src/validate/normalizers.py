@@ -39,6 +39,8 @@ def normalize_medications(meds):
     if not meds:
         return
     for m in meds:
+        if m.dose is not None and not isinstance(m.dose, str):
+            m.dose = str(m.dose)
         if m.frequency:
             m.frequency = normalize_frequency(m.frequency)
 
@@ -61,3 +63,11 @@ def normalize_structured(struct: StructuredNote):
     # normalize temp formatting: just ensure string if present
     if struct.vitals and struct.vitals.temp is not None:
         struct.vitals.temp = str(struct.vitals.temp)
+    # normalize spo2 to float if it is a string like "98%"
+    if struct.vitals and struct.vitals.spo2 is not None:
+        try:
+            if isinstance(struct.vitals.spo2, str):
+                val = struct.vitals.spo2.strip().replace("%", "")
+                struct.vitals.spo2 = float(val)
+        except Exception:
+            pass
