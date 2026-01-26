@@ -1,38 +1,110 @@
-EXTRACTION_PROMPT = '''
-You are an assistant that extracts structured JSON only from a free-text outpatient note.
-Return JSON only and strictly follow the schema keys. Do NOT add or invent any facts.
-If a field cannot be found, set it to null or empty list as appropriate.
+EXTRACTION_PROMPT = """
+You are an information extraction engine for outpatient clinical notes.
 
-Schema keys expected (top-level):
-- complaints: list of short strings or null
-- duration: string or null
-- vitals: object with bp_systolic, bp_diastolic, hr, spo2, temp (use null if absent)
-- findings: string or null
-- diagnosis: list of strings or null (ONLY include if explicitly documented in note)
-- medications: list of objects (name, dose, route, frequency, duration, prn)
-- tests: list of strings or null
-- advice: string or null
-- follow_up: string or null
-- flags: list (LLM may leave empty; deterministic checks will add flags)
+OUTPUT RULES (MUST FOLLOW):
+- Return ONE valid JSON object only. No markdown, no code fences, no commentary.
+- Use double quotes for all strings. No trailing commas. No NaN/Infinity.
+- Do not invent facts. Extract ONLY what is explicitly stated in the note.
+- If a value is missing, use null (or [] for lists). Do not guess.
+- Do NOT infer diagnosis. Include diagnosis only if explicitly written (e.g., "Dx:", "Diagnosis:", "Impression:").
+- Do NOT add any keys other than those in the schema below.
+- Do NOT output any 'evidence' fields (even if mentioned elsewhere). Keep it simple.
 
-HARD RULES:
-1) Never infer diagnosis. Only record diagnosis/problems if explicitly written in the note. If not present, set diagnosis to null and do NOT infer.
-2) Never invent missing values. If a field is absent, set null. Do not guess units, durations, doses, etc.
-3) Output valid JSON only. Do not include commentary, explanation, or markdown. Strict JSON only.
+BP RULE:
+- If BP is written like "120/80", set:
+  - vitals.bp_systolic = "120/80"
+  - vitals.bp_diastolic = null
+- If BP is clearly separated (e.g., "BP 120/80 mmHg" is still "120/80"), use the same rule above.
+- If systolic/diastolic are separately stated, you may set both as integers.
 
-Provide evidence fields only as short text when present (e.g., evidence_text and confidence). Keep confidence one of: high/medium/low when possible.
+SCHEMA (return exactly these keys, always present):
+{
+  "complaints": [],
+  "duration": null,
+  "vitals": {
+    "bp_systolic": null,
+    "bp_diastolic": null,
+    "hr": null,
+    "spo2": null,
+    "temp": null
+  },
+  "findings": null,
+  "diagnosis": [],
+  "medications": [],
+  "tests": [],
+  "advice": null,
+  "follow_up": null,
+  "flags": []
+}
 
-Now extract from the following NOTE and output JSON only:
-"""
+MEDICATION OBJECT SCHEMA (for each item in medications):
+{
+  "name": "",
+  "dose": null,
+  "route": null,
+  "frequency": null,
+  "duration": null,
+  "prn": null
+}
+
+Now extract from the NOTE below and return JSON only.
+
+NOTE:
+<note>
 {note_text}
+</note>
 """
-'''
 
-REPAIR_PROMPT = '''
-You are given a broken or partially incorrect JSON string. Your job: return valid JSON that matches the expected schema keys for the structured note, do not add clinical facts that are not present in the original broken JSON, only correct formatting, ensure all required keys are present (use null or empty lists where appropriate), and do not add new factual content.
+REPAIR_PROMPT = """
+You are a JSON repair engine.
+
+TASK:
+Fix the provided broken output into ONE valid JSON object that matches the schema exactly.
+You may:
+- Remove any non-JSON text (headers, markdown fences, commentary).
+- Fix quotes (single -> double), remove trailing commas, ensure valid JSON.
+- Add any missing required keys from the schema with null/[] defaults.
+- Ensure lists are lists and objects are objects.
+
+You must NOT:
+- Add new medical facts that are not present in the broken output.
+- Infer diagnosis or fill missing values with guesses.
+- Add keys outside the schema.
+
+TARGET SCHEMA (must match exactly, always present):
+{
+  "complaints": [],
+  "duration": null,
+  "vitals": {
+    "bp_systolic": null,
+    "bp_diastolic": null,
+    "hr": null,
+    "spo2": null,
+    "temp": null
+  },
+  "findings": null,
+  "diagnosis": [],
+  "medications": [],
+  "tests": [],
+  "advice": null,
+  "follow_up": null,
+  "flags": []
+}
+
+MEDICATION OBJECT SCHEMA:
+{
+  "name": "",
+  "dose": null,
+  "route": null,
+  "frequency": null,
+  "duration": null,
+  "prn": null
+}
+
+BROKEN OUTPUT (repair this):
+<broken>
+{bad_json}
+</broken>
 
 Return JSON only.
-
-Broken JSON:
-{bad_json}
-'''
+"""

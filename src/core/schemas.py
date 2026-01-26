@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Evidence(BaseModel):
@@ -15,6 +15,22 @@ class Medication(BaseModel):
     duration: Optional[str] = None
     prn: Optional[bool] = None
     evidence: Optional[Evidence] = None
+
+    @field_validator('prn', mode='before')
+    @classmethod
+    def parse_prn(cls, v):
+        """Convert string 'PRN' or similar to boolean."""
+        if v is None:
+            return None
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            # Common PRN indicators
+            if v.upper() in ('PRN', 'YES', 'TRUE', '1', 'Y'):
+                return True
+            if v.upper() in ('NO', 'FALSE', '0', 'N'):
+                return False
+        return v
 
 
 class Vitals(BaseModel):
