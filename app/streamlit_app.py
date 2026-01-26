@@ -928,7 +928,7 @@ if st.session_state.last_result:
     base_flags = [f for f in (flags or []) if f.startswith("PII detected")]
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Live Atlas — Evidence Highlights</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">DocSathi Highlights</div>', unsafe_allow_html=True)
     highlighted = highlight_note(note_text, summary)
     if highlighted:
         st.markdown(f'<div class="highlight-card">{highlighted}</div>', unsafe_allow_html=True)
