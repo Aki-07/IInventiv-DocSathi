@@ -639,6 +639,10 @@ if "followup_questions" not in st.session_state:
     st.session_state.followup_questions = []
 if "followup_error" not in st.session_state:
     st.session_state.followup_error = None
+if "show_debug" not in st.session_state:
+    st.session_state.show_debug = False
+if "strict_mode" not in st.session_state:
+    st.session_state.strict_mode = True
 
 provider_label = "OpenAI" if cfg.provider == "openai" else "Ollama"
 model_label = cfg.model if cfg.provider == "openai" else (cfg.ollama_model or "local model")
@@ -684,6 +688,46 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+# ---------------------------
+# Sidebar (from main branch)
+# ---------------------------
+with st.sidebar:
+    st.header("Demo Controls")
+
+    sample = st.selectbox(
+        "Load a sample note",
+        ["-- none --"] + list(SAMPLE_NOTES.keys()),
+        key="sample_choice",
+    )
+
+    side_cols = st.columns(2)
+    with side_cols[0]:
+        if st.button("Load", use_container_width=True):
+            if sample != "-- none --":
+                st.session_state.note_text = SAMPLE_NOTES[sample]
+            else:
+                st.warning("Pick a sample first.")
+    with side_cols[1]:
+        if st.button("Clear", use_container_width=True):
+            st.session_state.sample_choice = "-- none --"
+            st.session_state.note_text = ""
+            st.session_state.last_result = None
+            st.session_state.last_error = None
+
+    st.divider()
+    st.subheader("Settings")
+    st.session_state.strict_mode = st.toggle("Strict mode (more flags)", value=st.session_state.strict_mode)
+    st.session_state.show_debug = st.toggle("Show debug tab", value=st.session_state.show_debug)
+
+    st.divider()
+    st.subheader("LLM status")
+    if cfg.provider == "openai" and cfg.has_api_key:
+        st.success(f"Enabled: {cfg.model}")
+    elif cfg.provider == "ollama" and cfg.ollama_model:
+        st.success(f"Enabled: {cfg.ollama_model}")
+    else:
+        st.warning("Disabled: LLM not configured")
 
 
 def trigger_pipeline(note_text: str, sample_choice: str):
@@ -783,18 +827,8 @@ with col1:
             unsafe_allow_html=True,
         )
 with col2:
-    st.markdown('<div class="section-title">Sample Notes</div>', unsafe_allow_html=True)
-    st.markdown('<div class="muted">Pick a pre-filled example note.</div>', unsafe_allow_html=True)
-    sample = st.selectbox(
-        "Choose a sample note:",
-        ["-- none --"] + list(SAMPLE_NOTES.keys()),
-        key="sample_choice",
-        label_visibility="collapsed",
-    )
-    if sample != "-- none --":
-        if st.button("Load sample"):
-            st.session_state.note_text = SAMPLE_NOTES[sample]
-    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Safety Guardrails</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted">System checks that keep outputs safe and compliant.</div>', unsafe_allow_html=True)
     guardrails = []
     guardrails.append(("No diagnosis inference", "status-ok", "Always on"))
 
@@ -841,7 +875,7 @@ if run_button:
             '<div class="inline-spinner"><span class="spinner-dot"></span>Structuring...</div>',
             unsafe_allow_html=True,
         )
-    trigger_pipeline(note_text, sample)
+    trigger_pipeline(note_text, st.session_state.sample_choice)
     if "run_spinner_slot" in locals():
         run_spinner_slot.empty()
 
