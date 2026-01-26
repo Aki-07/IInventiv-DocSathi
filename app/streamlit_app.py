@@ -28,7 +28,7 @@ load_dotenv()
 logger = get_logger()
 cfg = get_config()
 
-st.set_page_config(page_title="DocSathi : OurClinical Atlas", layout="wide", page_icon="🩺")
+st.set_page_config(page_title="DocSathi", layout="wide", page_icon="🩺")
 
 st.markdown(
     """
@@ -359,6 +359,29 @@ div[data-testid="stAppViewBlockContainer"] {
 .stTextArea label, .stSelectbox label, .stTextInput label {
   color: var(--atlas-ink);
 }
+[data-testid="stDataFrame"] {
+  background: #fffdf8 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--atlas-border) !important;
+  padding: 6px !important;
+}
+[data-testid="stDataFrame"] [data-testid="stTable"] {
+  color: var(--atlas-ink) !important;
+  background: #fffdf8 !important;
+}
+[data-testid="stDataFrame"] * {
+  color: var(--atlas-ink) !important;
+}
+[data-testid="stDataFrame"] .dataframe,
+[data-testid="stDataFrame"] table,
+[data-testid="stDataFrame"] thead,
+[data-testid="stDataFrame"] tbody,
+[data-testid="stDataFrame"] tr,
+[data-testid="stDataFrame"] th,
+[data-testid="stDataFrame"] td {
+  background-color: #fffdf8 !important;
+  color: var(--atlas-ink) !important;
+}
 
 /* Hide Streamlit chrome (Deploy button, menu, footer) */
 header[data-testid="stHeader"],
@@ -623,8 +646,10 @@ def apply_edits(summary, note_text: str, base_flags):
 
 if "note_text" not in st.session_state:
     st.session_state.note_text = ""
+SAMPLE_PLACEHOLDER = "Select a sample…"
+
 if "sample_choice" not in st.session_state:
-    st.session_state.sample_choice = "-- none --"
+    st.session_state.sample_choice = SAMPLE_PLACEHOLDER
 if "last_result" not in st.session_state:
     st.session_state.last_result = None
 if "last_error" not in st.session_state:
@@ -639,10 +664,6 @@ if "followup_questions" not in st.session_state:
     st.session_state.followup_questions = []
 if "followup_error" not in st.session_state:
     st.session_state.followup_error = None
-if "show_debug" not in st.session_state:
-    st.session_state.show_debug = False
-if "strict_mode" not in st.session_state:
-    st.session_state.strict_mode = True
 
 provider_label = "OpenAI" if cfg.provider == "openai" else "Ollama"
 model_label = cfg.model if cfg.provider == "openai" else (cfg.ollama_model or "local model")
@@ -669,7 +690,7 @@ st.markdown(
   <div class="navbar-left">
     {logo_html}
     <div>
-      <div class="navbar-title">DocSathi : OurClinical Atlas</div>
+      <div class="navbar-title">DocSathi</div>
       <div class="navbar-subtitle">ABDM-ready clinical note structuring assistant for documentation support only.</div>
     </div>
   </div>
@@ -689,46 +710,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ---------------------------
-# Sidebar (from main branch)
-# ---------------------------
-with st.sidebar:
-    st.header("Demo Controls")
-
-    sample = st.selectbox(
-        "Load a sample note",
-        ["-- none --"] + list(SAMPLE_NOTES.keys()),
-        key="sample_choice",
-    )
-
-    side_cols = st.columns(2)
-    with side_cols[0]:
-        if st.button("Load", use_container_width=True):
-            if sample != "-- none --":
-                st.session_state.note_text = SAMPLE_NOTES[sample]
-            else:
-                st.warning("Pick a sample first.")
-    with side_cols[1]:
-        if st.button("Clear", use_container_width=True):
-            st.session_state.sample_choice = "-- none --"
-            st.session_state.note_text = ""
-            st.session_state.last_result = None
-            st.session_state.last_error = None
-
-    st.divider()
-    st.subheader("Settings")
-    st.session_state.strict_mode = st.toggle("Strict mode (more flags)", value=st.session_state.strict_mode)
-    st.session_state.show_debug = st.toggle("Show debug tab", value=st.session_state.show_debug)
-
-    st.divider()
-    st.subheader("LLM status")
-    if cfg.provider == "openai" and cfg.has_api_key:
-        st.success(f"Enabled: {cfg.model}")
-    elif cfg.provider == "ollama" and cfg.ollama_model:
-        st.success(f"Enabled: {cfg.ollama_model}")
-    else:
-        st.warning("Disabled: LLM not configured")
-
 
 def trigger_pipeline(note_text: str, sample_choice: str):
     if not note_text.strip():
@@ -738,7 +719,7 @@ def trigger_pipeline(note_text: str, sample_choice: str):
     try:
         llm_client = None
         if cfg.provider == "openai" and not cfg.has_api_key:
-            if sample_choice != "-- none --":
+            if sample_choice != SAMPLE_PLACEHOLDER:
                 class DummyLLM:
                     def extract_structured(self, note_text, options=None):
                         return {
@@ -780,6 +761,20 @@ def trigger_pipeline(note_text: str, sample_choice: str):
         st.session_state.last_error = str(e)
 
 
+def load_sample_note():
+    sample_key = st.session_state.get("sample_choice", SAMPLE_PLACEHOLDER)
+    if sample_key != SAMPLE_PLACEHOLDER:
+        st.session_state.note_text = SAMPLE_NOTES[sample_key]
+    else:
+        st.session_state.last_error = "Pick a sample note first."
+
+
+def clear_note():
+    st.session_state.note_text = ""
+    st.session_state.last_result = None
+    st.session_state.last_error = None
+
+
 def generate_followups(note_text: str, summary, flags):
     try:
         llm = LLMClient(
@@ -817,18 +812,24 @@ with col1:
         run_button = st.button("Structure Note")
         run_spinner_slot = st.empty()
     with action_cols[1]:
-        if st.button("Clear"):
-            st.session_state.note_text = ""
-            st.session_state.last_result = None
-            st.session_state.last_error = None
+        st.button("Clear", on_click=clear_note)
     with action_cols[2]:
         st.markdown(
             '<span class="mono">Tip:</span> Use short, focused sentences for best extraction.',
             unsafe_allow_html=True,
         )
 with col2:
-    st.markdown('<div class="section-title">Safety Guardrails</div>', unsafe_allow_html=True)
-    st.markdown('<div class="muted">System checks that keep outputs safe and compliant.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Sample Notes</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted">Pick a pre-filled example note.</div>', unsafe_allow_html=True)
+    sample = st.selectbox(
+        "Choose a sample note:",
+        [SAMPLE_PLACEHOLDER] + list(SAMPLE_NOTES.keys()),
+        key="sample_choice",
+        label_visibility="collapsed",
+    )
+    if sample != SAMPLE_PLACEHOLDER:
+        st.button("Load sample", on_click=load_sample_note)
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     guardrails = []
     guardrails.append(("No diagnosis inference", "status-ok", "Always on"))
 
@@ -875,7 +876,7 @@ if run_button:
             '<div class="inline-spinner"><span class="spinner-dot"></span>Structuring...</div>',
             unsafe_allow_html=True,
         )
-    trigger_pipeline(note_text, st.session_state.sample_choice)
+    trigger_pipeline(note_text, sample)
     if "run_spinner_slot" in locals():
         run_spinner_slot.empty()
 
@@ -1104,6 +1105,47 @@ if st.session_state.last_result:
 """,
                 unsafe_allow_html=True,
             )
+
+        st.markdown('<div class="section-title" style="margin-top:18px;">Medications</div>', unsafe_allow_html=True)
+        meds_rows = []
+        for med in summary.medications or []:
+            meds_rows.append(
+                {
+                    "Name": med.name,
+                    "Dose": med.dose or "",
+                    "Route": med.route or "",
+                    "Frequency": med.frequency or "",
+                    "Duration": med.duration or "",
+                    "PRN": "Yes" if med.prn else "",
+                }
+            )
+        if meds_rows:
+            headers = ["Name", "Dose", "Route", "Frequency", "Duration", "PRN"]
+            rows_html = "".join(
+                [
+                    "<tr>"
+                    + "".join([f"<td style='padding:8px 10px;border:1px solid #e2d7c4;'>{m.get(h,'')}</td>" for h in headers])
+                    + "</tr>"
+                    for m in meds_rows
+                ]
+            )
+            table_html = f"""
+<div class="card" style="padding:0;">
+  <table style="width:100%; border-collapse:collapse; background:#fffdf8; color:#152726; border-radius:12px; overflow:hidden;">
+    <thead>
+      <tr>
+        {''.join([f"<th style='text-align:left;padding:10px;border:1px solid #e2d7c4;background:#f6efe4;'>{h}</th>" for h in headers])}
+      </tr>
+    </thead>
+    <tbody>
+      {rows_html}
+    </tbody>
+  </table>
+</div>
+"""
+            st.markdown(table_html, unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="card"><div class="mono">—</div></div>', unsafe_allow_html=True)
 
         with st.expander("Full structured JSON"):
             st.json(summary.model_dump() if hasattr(summary, "model_dump") else summary.dict())
