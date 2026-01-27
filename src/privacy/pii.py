@@ -1,5 +1,5 @@
 from typing import Tuple, List
-from src.privacy.patterns import PHONE_RE, EMAIL_RE, AADHAAR_RE, MRN_RE
+from src.privacy.patterns import PHONE_RE, EMAIL_RE, AADHAAR_RE, MRN_RE, NAME_RE
 
 
 def mask_pattern(text: str, regex, label: str):
@@ -14,7 +14,13 @@ def mask_pattern(text: str, regex, label: str):
 def mask_pii(note: str) -> Tuple[str, List[str]]:
     flags = []
     masked = note
-    for regex, label in [(PHONE_RE, "PHONE"), (EMAIL_RE, "EMAIL"), (AADHAAR_RE, "AADHAAR"), (MRN_RE, "MRN")]:
+    for regex, label in [
+        (PHONE_RE, "PHONE"),
+        (EMAIL_RE, "EMAIL"),
+        (AADHAAR_RE, "AADHAAR"),
+        (MRN_RE, "MRN"),
+        (NAME_RE, "NAME"),
+    ]:
         masked, new_flags = mask_pattern(masked, regex, label)
         flags.extend(new_flags)
     # unique
