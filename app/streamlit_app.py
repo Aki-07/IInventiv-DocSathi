@@ -20,7 +20,7 @@ from src.utils.config import get_config
 from app.sample_notes import SAMPLE_NOTES
 from src.utils.logging import get_logger
 from src.export.fhir_bundle import build_fhir_bundle
-from src.privacy.patterns import PHONE_RE, EMAIL_RE, AADHAAR_RE, MRN_RE
+from src.privacy.patterns import PHONE_RE, EMAIL_RE, AADHAAR_RE, MRN_RE, NAME_RE
 from src.validate.normalizers import normalize_structured
 from src.validate.validators import run_validations
 
@@ -195,6 +195,11 @@ div[data-testid="stAppViewBlockContainer"] {
 .status-info {
   background: rgba(21, 39, 38, 0.08);
   color: var(--atlas-ink);
+}
+.guardrails-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .navbar {
   animation: fadeUp 0.6s ease both;
@@ -566,7 +571,7 @@ def highlight_pii(text: str) -> str:
     if not text:
         return ""
     out = text
-    for regex in (PHONE_RE, EMAIL_RE, AADHAAR_RE, MRN_RE):
+    for regex in (PHONE_RE, EMAIL_RE, AADHAAR_RE, MRN_RE, NAME_RE):
         try:
             out = regex.sub(lambda m: f'<span class="hl-pii">{m.group(0)}</span>', out)
         except re.error:
@@ -664,15 +669,9 @@ if "followup_questions" not in st.session_state:
     st.session_state.followup_questions = []
 if "followup_error" not in st.session_state:
     st.session_state.followup_error = None
-if "ollama_model_choice" not in st.session_state:
-    st.session_state.ollama_model_choice = "gemma2:2b"
 
 provider_label = "OpenAI" if cfg.provider == "openai" else "Ollama"
-model_label = (
-    cfg.model
-    if cfg.provider == "openai"
-    else st.session_state.ollama_model_choice
-)
+model_label = cfg.model if cfg.provider == "openai" else (cfg.ollama_model or "local model")
 
 asset_dir = REPO_ROOT / "app" / "assets"
 logo_b64 = None
@@ -703,7 +702,7 @@ st.markdown(
   <div class="navbar-badges">
     <span class="badge">Documentation Support Only</span>
     <span class="badge badge-ochre">No Diagnosis Inference</span>
-    <span class="badge">{provider_label} · {model_label}</span>
+    <span class="badge">FHIR-aligned Export</span>
   </div>
 </div>
 <div class="stepper">
@@ -727,7 +726,7 @@ def trigger_pipeline(note_text: str, sample_choice: str):
         if cfg.provider == "ollama":
             llm_client = LLMClient(
                 provider="ollama",
-                ollama_model=st.session_state.ollama_model_choice,
+                ollama_model=cfg.ollama_model,
                 ollama_base_url=cfg.ollama_base_url,
             )
         if cfg.provider == "openai" and not cfg.has_api_key:
@@ -793,7 +792,7 @@ def generate_followups(note_text: str, summary, flags):
             model=cfg.model,
             provider=cfg.provider,
             base_url=cfg.base_url,
-            ollama_model=st.session_state.ollama_model_choice,
+            ollama_model=cfg.ollama_model,
             ollama_base_url=cfg.ollama_base_url,
         )
         structured_payload = summary.model_dump() if hasattr(summary, "model_dump") else summary.dict()
@@ -831,16 +830,6 @@ with col1:
             unsafe_allow_html=True,
         )
 with col2:
-    if cfg.provider == "ollama":
-        st.markdown('<div class="section-title">Model</div>', unsafe_allow_html=True)
-        st.markdown('<div class="muted">Select the local Ollama model.</div>', unsafe_allow_html=True)
-        st.selectbox(
-            "Ollama model",
-            ["gemma2:2b", "deepseek-r1:8b"],
-            key="ollama_model_choice",
-            label_visibility="collapsed",
-        )
-        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Sample Notes</div>', unsafe_allow_html=True)
     st.markdown('<div class="muted">Pick a pre-filled example note.</div>', unsafe_allow_html=True)
     sample = st.selectbox(
@@ -881,7 +870,7 @@ with col2:
         f"""
 <div class="card">
   <div class="card-title">Safety Guardrails</div>
-  <div>{guardrails_html}</div>
+  <div class="guardrails-wrap">{guardrails_html}</div>
 </div>
 """,
         unsafe_allow_html=True,
@@ -889,8 +878,8 @@ with col2:
 
 if cfg.provider == "openai" and not cfg.has_api_key:
     st.warning("OPENAI_API_KEY not set. The app can still show sample notes but live LLM calls are disabled.")
-if cfg.provider == "ollama" and not st.session_state.ollama_model_choice:
-    st.warning("Select an Ollama model to run.")
+if cfg.provider == "ollama" and not cfg.ollama_model:
+    st.warning("OLLAMA_MODEL not set. Add it in .env to run with Ollama.")
 
 if run_button:
     if "run_spinner_slot" in locals():
@@ -1184,7 +1173,7 @@ if st.session_state.last_result:
                 generate_followups(note_text, summary, flags)
         with info_cols[1]:
             st.markdown(
-                "<div class='muted'>Auto‑suggested questions to complete missing fields. Uses a second LLM call.</div>",
+                "<div class='muted'>Auto‑suggested questions to complete missing fields.</div>",
                 unsafe_allow_html=True,
             )
 

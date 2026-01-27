@@ -1,0 +1,20 @@
+{
+  "model": "medllama2:7b",
+  "dataset": "src/data/synthetic_notes.jsonl",
+  "count": 10,
+  "latency_avg_s": 7.6297108707003645,
+  "latency_p50_s": 7.6941942289995495,
+  "latency_p95_s": 9.030767633154756,
+  "presence_accuracy_avg": 0.6777777777777777,
+  "presence_accuracy": {
+    "complaints": 1.0,
+    "duration": 0.5,
+    "vitals": 0.6,
+    "findings": 0.7,
+    "diagnosis": 0.4,
+    "medications": 1.0,
+    "tests": 0.7,
+    "advice": 0.2,
+    "follow_up": 1.0
+  }
+}
