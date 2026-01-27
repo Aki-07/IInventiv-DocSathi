@@ -66,7 +66,7 @@ class LLMClient:
             resp = openai.ChatCompletion.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
+                # temperature=temperature,
                 timeout=self.timeout,
             )
             return resp.choices[0].message.content
@@ -74,7 +74,7 @@ class LLMClient:
         resp = self._openai_client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
-            temperature=temperature,
+            # temperature=temperature,
             timeout=self.timeout,
         )
         return resp.choices[0].message.content
