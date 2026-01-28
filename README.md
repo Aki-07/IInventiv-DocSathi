@@ -35,11 +35,12 @@ cp .env.example .env
 
 Required:
 
-* `OPENAI_API_KEY`
+* LLM API access through `Ollama` or `OPENAI`
 
 Optional:
 
-* `OPENAI_MODEL` (defaults to `gpt-5-mini`)
+* `OPENAI_API_KEY`
+* `OPENAI_MODEL` (defaults to `gpt-5-nano`)
 * `OPENAI_BASE_URL` (if using an OpenAI-compatible gateway)
 
 ### 3) Run the Streamlit app
